@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import type { Schema } from "../amplify/data/resource";
 import { generateClient } from "aws-amplify/data";
 
+import { signUp, confirmSignUp, fetchUserAttributes } from "aws-amplify/auth";
 
 import { Authenticator } from '@aws-amplify/ui-react'
 import '@aws-amplify/ui-react/styles.css'
-import { getCurrentUser } from "aws-amplify/auth";
 
 const client = generateClient<Schema>();
 
@@ -16,7 +16,17 @@ function App() {
     client.models.Todo.observeQuery().subscribe({
       next: (data) => setTodos([...data.items]),
     });
+
+    fetchAttr();
+
   }, []);
+
+  const fetchAttr = async () => {
+    const attr = await fetchUserAttributes();
+    console.log("attr", attr);
+  }
+
+
 
   function createTodo() {
     client.models.Todo.create({ content: window.prompt("Todo content"), isDone: false });
@@ -27,14 +37,41 @@ function App() {
     client.models.Todo.delete({ id })
   }
 
-  getCurrentUser().then(({ username, userId, signInDetails }) => {
-    console.log("user details", signInDetails);
-    console.log("username", username);
-    console.log("user id", userId);
-  }).catch((err) => {
-    console.log(err);
+  const createUser = async () => {
 
-  });
+    const username = window.prompt("Enter username")
+    const password = window.prompt("Enter password")
+
+    if (!username || !password) throw new Error("No username or password");
+
+    const response = await signUp({
+      username,
+      password,
+      options: {
+        userAttributes: {
+          email: username,
+          'custom:role': 'admin',
+        }
+      }
+    });
+
+    if (response.userId) {
+      confirmUserSignUp(username);
+    }
+  }
+
+
+  const confirmUserSignUp = async (username: string) => {
+
+    const confirmationCode = window.prompt("Enter confirmation code")
+
+    if (!confirmationCode) throw new Error("No confirmation code");
+
+    await confirmSignUp({
+      username,
+      confirmationCode,
+    });
+  }
 
   return (
 
@@ -59,6 +96,8 @@ function App() {
             </a>
           </div>
           <button onClick={signOut}>Sign out</button>
+          <button onClick={createUser}>Create User</button>
+          {/* <button onClick={confirmUserSignUp}>Confirm User</button> */}
         </main>
       )}
     </Authenticator>
